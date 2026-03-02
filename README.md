@@ -1,2 +1,2 @@
 # finbot
-Bot financeiro utilizando deepseek api e twillo para uso dentro do whatsapp.
+Bot financeiro utilizando gemini api e telegram bot para uso via chat.
