@@ -1,8 +1,9 @@
 import os
 import logging
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from bot.bot_commands import resume_command, categories_command, budget_command
+from ai.gemini_client import FinanceAnalyst
 from dotenv import load_dotenv
-from bot_commands import resume_command, categories_command, budget_command
 from telegram import Update
 
 
@@ -44,15 +45,17 @@ async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     logger.info(f"Mensagem de {user_id}:{user_message}")
 
-    #TODO: Integrar com o gemini para análise da mensagem
     await update.message.reply_text("Processsando seu gasto...")
+    assistant = FinanceAnalyst(GEMINI_API_KEY)
+    response = assistant.analise(user_message)
 
-    #Mensagem temporaŕia de exemplo
+    #TODO: No futuro vai chamar o metodo que insere os dados no banco.
+    #TODO: Adicionar tratamento de exceção para quando gemini falhar.
     await update.message.reply_text(
-        ":check: Gasto registrado!\n"
-        "Valor: R$ 50,00\n"
-        "Categoria: Alimentação\n"
-        "Descrição: Mercado"
+        f"Gasto de R$ {response.get('valor',0):.2f}," 
+        f" categoria: {response.get('categoria','desconhecida')}," 
+        f" descrição: {response.get('descricao','')}\n"
+        "Registrado com sucesso!"
     )
 
 
