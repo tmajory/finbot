@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Comando start, mensagem amigável e perguntando qual o registro!"""
     await update.message.reply_text(
-        "Olá! Eu sou o finbot seu assistente financeiro!\n\n"
+        "Olá! Eu sou o finbot seu assistente financeiro!\n"
         "Como usar:\n"
         "Envie seus gastos: 'Gastei R$ 50 com mercado'\n"
         "Envie comprovante como foto\n"
@@ -40,43 +40,39 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text
-    user_id = update.effective_user.id
+async def process_message(message:str) -> dict:
+    """recebe a mensagem enviada pelo o usuário e chama o assistente para gerar a resposta
+    TODO implementar tratamento de exceção caso gemini falhe, extrair as informações direto do texto."""
+    response = assistant.analise(message)
+    return response 
 
-    logger.info(f"Mensagem de {user_id}:{user_message}")
 
-    await update.message.reply_text("Processsando seu gasto...")
-    response = assistant.analise(user_message)
 
-    #TODO: No futuro vai chamar o metodo que insere os dados no banco.
-    #TODO: Adicionar tratamento de exceção para quando gemini falhar.
+async def process_photo(image_path):
+    response = assistant.image_analise(image_path)
+    return response     
+
+
+async def process_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Metodo geral, recebe a mensagem testa se foto ou texto e chama a função correta de processamento."""
+    logger.info(f"Mensagem de {update.effective_user.id}:{update.message.text}")
+    response = {}
+    await update.message.reply_text("Processando seu registro...")
+    if update.message.text:
+       user_message = update.message.text
+       response = process_message(user_message)
+    elif update.message.photo:
+        photo_file = await update.message.photo[-1].get_file()
+        #download temporário da foto
+        img_path = await photo_file.download_to_drive(f"temp/{update.message.photo[-1].file_id}.jpg")
+        response = process_photo(img_path)
     await update.message.reply_text(
         f"Gasto de R$ {response.get('valor',0):.2f}," 
-        f" categoria: {response.get('categoria','desconhecida')}," 
-        f" descrição: {response.get('descricao','')}\n"
+        f"categoria: {response.get('categoria','desconhecida')}," 
+        f"descrição: {response.get('descricao','')}\n"
         "Registrado com sucesso!"
     )
 
-
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    photo_file = await update.message.photo[-1].get_file()
-
-    #download temporário da foto
-    img_path = await photo_file.download_to_drive(f"temp/{update.message.photo[-1].file_id}.jpg")
-
-    await update.message.reply_text("Processando comprovante...")
-    response = assistant.image_analise(image_path=img_path)
-    
-
-    #TODO:Processar imagem com gemini vision
-    await update.message.reply_text(
-        f"""
-        Gasto de {response.get('Valor',0):.2f}\n
-        Categoria: {response.get('Categoria')}\n
-        Descricao: {response.get('Descricao')}
-        Registrado com sucesso a partir da imagem!
-    """)
 
 def main():
     """Inicializa o bot"""
@@ -88,13 +84,11 @@ def main():
     app.add_handler(CommandHandler("categorias",categories_command))
     app.add_handler(CommandHandler("orcamento", budget_command))
 
-
-    try:
-        #Mensagens de texto
-        app.add_handler(MessageHandler(filters.Text and ~filters.COMMAND, process_message))
-    except:
-        #Imagens
-        app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    
+    
+    app.add_handler(MessageHandler(filters.PHOTO | filters.Text  and ~filters.COMMAND, process_data))
+    
+    
 
     #Iniciar bot
     print("Bot iniciado! Pressione ctrl+C para parar.")
