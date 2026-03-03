@@ -11,6 +11,7 @@ load_dotenv("config/.env")
 
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+assistant = FinanceAnalyst(GEMINI_API_KEY)
 
 #logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level = logging.INFO)
@@ -22,9 +23,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Olá! Eu sou o finbot seu assistente financeiro!\n\n"
         "Como usar:\n"
-        "Envie seus gastos: 'Gastei R$ 50 mno mercado'\n"
+        "Envie seus gastos: 'Gastei R$ 50 com mercado'\n"
         "Envie comprovante como foto\n"
-        "Comandos: /resumo, /categorias, /help"
+        "Comandos: /resumo, /categorias, /orcamento, /ajuda"
     )
     
 
@@ -46,7 +47,6 @@ async def process_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Mensagem de {user_id}:{user_message}")
 
     await update.message.reply_text("Processsando seu gasto...")
-    assistant = FinanceAnalyst(GEMINI_API_KEY)
     response = assistant.analise(user_message)
 
     #TODO: No futuro vai chamar o metodo que insere os dados no banco.
@@ -63,13 +63,20 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     photo_file = await update.message.photo[-1].get_file()
 
     #download temporário da foto
-    await photo_file.download_to_drive(f"temp/{update.message.photo[-1].file_id}.jpg")
+    img_path = await photo_file.download_to_drive(f"temp/{update.message.photo[-1].file_id}.jpg")
 
     await update.message.reply_text("Processando comprovante...")
+    response = assistant.image_analise(image_path=img_path)
+    
 
     #TODO:Processar imagem com gemini vision
-    await update.message.reply_text("Comprovante processado!")
-
+    await update.message.reply_text(
+        f"""
+        Gasto de {response.get('Valor',0):.2f}\n
+        Categoria: {response.get('Categoria')}\n
+        Descricao: {response.get('Descricao')}
+        Registrado com sucesso a partir da imagem!
+    """)
 
 def main():
     """Inicializa o bot"""
@@ -82,11 +89,12 @@ def main():
     app.add_handler(CommandHandler("orcamento", budget_command))
 
 
-    #Mensagens de texto
-    app.add_handler(MessageHandler(filters.Text and ~filters.COMMAND, process_message))
-
-    #Imagens
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    try:
+        #Mensagens de texto
+        app.add_handler(MessageHandler(filters.Text and ~filters.COMMAND, process_message))
+    except:
+        #Imagens
+        app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     #Iniciar bot
     print("Bot iniciado! Pressione ctrl+C para parar.")
