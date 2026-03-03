@@ -145,6 +145,7 @@ env.bak/
 venv.bak/
 .vscode/
 config/
+temp/
 
 # Spyder project settings
 .spyderproject
