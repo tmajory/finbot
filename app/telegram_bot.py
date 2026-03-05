@@ -1,3 +1,4 @@
+#type: ignore
 import os
 import logging
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -55,7 +56,7 @@ async def process_photo(image_path):
 
 async def process_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Metodo geral, recebe a mensagem testa se foto ou texto e chama a função correta de processamento."""
-    logger.info(f"Mensagem de {update.effective_user.id}:{update.message.text}")
+    logger.info(f"Mensagem de {update.effective_user.id}:{update.message.text}")#type: ignore
     response = {}
     await update.message.reply_text("Processando seu registro...")
     if update.message.text:
