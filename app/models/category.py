@@ -2,8 +2,8 @@ from base import BaseModel
 from typing import List
 from expense import Expense
 from budget import Budget
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import String, Integer
+from sqlalchemy.orm import Mapped, mapped_column, relationship, Session
+from sqlalchemy import String, select
 
 #Category entity declaration
 
@@ -20,3 +20,5 @@ class Category(BaseModel):
     budgets : Mapped[List["Budget"]] = relationship(
         back_populates="budgets",
         lazy="selectin")
+
+        

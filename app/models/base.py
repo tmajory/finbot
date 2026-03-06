@@ -1,5 +1,6 @@
-from sqlalchemy import Integer
+from sqlalchemy import Integer, select
 from sqlalchemy.orm import mapped_column, declarative_base, Session, Mapped
+from datetime import date
 
 Base = declarative_base()
 
@@ -30,6 +31,7 @@ class BaseModel(Base):
         for key, value in kwargs.items():
             self.__setattr__(key,value)
         return self
+    
 
     def save(self, session: Session, **kwargs):
         """Method that saves a instance using sqlalchemy strategy"""
@@ -51,3 +53,29 @@ class BaseModel(Base):
         except Exception as e:
             session.rollback()
             return  False, e #Return if fails
+
+    @classmethod
+    def get_all(cls, session: Session):#Return all instances
+        stmt = select(cls)
+        return session.scalars(stmt).all()
+
+    @classmethod
+    def get_by_id(cls, session: Session, id:int):#Return the instance by id
+        stmt = select(cls).where(cls.id == id )
+        instance = session.scalar(stmt)
+        if instance:
+            return instance
+        return None
+
+    @classmethod
+    def get_by_date(cls,  session: Session, date: date):#Return the instance with a specific date uses only to expenses and budgets
+        stmt = select(cls).where(cls.date == date)
+        return session.scalars(stmt).all()
+
+    @classmethod
+    def get_by_category(cls, session: Session, category_id: int):#Return the instance with a specific category uses only to expenses and budgets
+        if not hasattr(cls, 'category_id'):
+            raise NotImplementedError(f"{cls.__name__} does not have category_id")
+        stmt = select(cls).where(cls.category_id==category_id)
+        return session.scalars(stmt).all()
+    

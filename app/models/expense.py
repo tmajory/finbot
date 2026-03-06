@@ -1,9 +1,10 @@
+from user import User
+from datetime import date
 from base import BaseModel
 from typing import Optional
-from datetime import date
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Numeric, Date, String, ForeignKey
-from user import User
+from sqlalchemy.sql import functions as func
+from sqlalchemy.orm import Mapped, Session,mapped_column, relationship
+from sqlalchemy import Numeric, Date, String, ForeignKey, select, extract
 
 #Expenses class
 
@@ -20,3 +21,29 @@ class Expense(BaseModel):
     
     #Relationship declaration
     user: Mapped[Optional["User"]] = relationship(back_populates="expenses")
+
+
+    @classmethod
+    def expenses_total(cls, session: Session, user_id:int, category_id = None, month = None):
+        """Return the expenses sum or total or filtered by category and month
+        """
+        stmt =  select(func.sum(cls.value)).where(cls.user_id==user_id)
+        if category_id and month:
+            stmt = stmt.where(cls.category_id==category_id).where(extract('month',cls.date) == month)
+        sum_value = session.scalar(stmt)
+        return sum_value
+    
+    @classmethod
+    def expenses_total_by_category(cls, session: Session, category_id:int):
+        """Return the total expenses of that category"""
+        stmt =  select(func.sum(cls.value)).where(cls.category_id==category_id)
+        sum_by_category = session.scalar(stmt)
+        return sum_by_category
+
+
+    @classmethod
+    def expenses_count_by_category(cls, session: Session, category_id):
+        """Return the number of expenses with that category id"""
+        stmt = select(func.count(cls.id)).where(cls.category_id==category_id)
+        count_expenses = session.scalar(stmt)
+        return count_expenses
