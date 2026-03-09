@@ -13,7 +13,8 @@ class User(BaseModel):
     __tablename__ = 'user'
     __table_args__ = {'schema': 'finbot'}
 
-    nickname : Mapped[str] = mapped_column(String(50), unique=True)#Unique nickname
+    telegram_id : Mapped[str] = mapped_column('id', String(100), unique = True)#Unique telegram_id
+    name : Mapped[str] = mapped_column('nickname', String(50))#nickname
     #Expenses table relationship configuration
     expenses : Mapped[List["Expense"]] = relationship(
         back_populates = "user",

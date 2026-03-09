@@ -1,11 +1,14 @@
-from user import User
-from typing import Optional
 from datetime import date
 from base import BaseModel
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy.sql import functions as func
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 from sqlalchemy import Numeric, Date, ForeignKey, UniqueConstraint, select, extract
 
+
+if TYPE_CHECKING:
+    from user import User
+    from category import Category
 
 #Budget class
 
@@ -14,16 +17,18 @@ class Budget(BaseModel):
     __tablename__ ='budget'
     __table_args__ = (UniqueConstraint('category_id', 'date', name='uq_budget_category_date'), {'schema':'finbot'})
 
-    value: Mapped[float] = mapped_column(Numeric(10,2))#Value of the expense
+ 
+    value: Mapped[float] = mapped_column(Numeric(10,2), nullable=False)#Value of the expense
     date: Mapped[Date] = mapped_column(Date, default = date.today)#Date of the expense
     
     user_id: Mapped[int] = mapped_column(ForeignKey('finbot.user.id'))#Foreign key of users table
     category_id : Mapped[int] = mapped_column(ForeignKey('finbot.category.id'))#Foreign key of the categories table
 
     user: Mapped[Optional["User"]] = relationship(back_populates="budgets")
+    category: Mapped[Optional["Category"]] = relationship(back_populates="budgets")
 
     
-    def update_budget(self, session: Session, **kwargs):
+    def save_budget(self, session: Session, **kwargs):
         #Atualiza orçamento validando se o valor foi enviado.
         value = kwargs.get("value")
         if value == None or value <= 0:

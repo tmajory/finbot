@@ -37,12 +37,12 @@ class BaseModel(Base):
         """Method that saves a instance using sqlalchemy strategy"""
         instance = self.set_attributes(**kwargs)
         try:
-            session.merge(instance)
+            merged = session.merge(instance)
             session.commit()
-            return True, None #Return if the save success
+            return merged, None#Return if the save success
         except Exception as e:
             session.rollback()
-            return False, e #Return if fails
+            return None, e #Return if fails
         
     def delete(self, session: Session):
         """Hard delete!"""
@@ -56,26 +56,48 @@ class BaseModel(Base):
 
     @classmethod
     def get_all(cls, session: Session):#Return all instances
-        stmt = select(cls)
-        return session.scalars(stmt).all()
+        try:
+            stmt = select(cls)
+            instances = session.scalars(stmt).all()
+            return instances, None
+        except Exception as e:
+            return None, e
 
     @classmethod
-    def get_by_id(cls, session: Session, id:int):#Return the instance by id
-        stmt = select(cls).where(cls.id == id )
-        instance = session.scalar(stmt)
-        if instance:
-            return instance
-        return None
+    def get_by_id(cls, session: Session, id):#Return the instance by id
+        try:
+            stmt = select(cls).where(cls.id == id )
+            instance = session.scalar(stmt)
+            return instance, None
+        except Exception as e:
+            return None, e
 
     @classmethod
     def get_by_date(cls,  session: Session, date: date):#Return the instance with a specific date uses only to expenses and budgets
-        stmt = select(cls).where(cls.date == date)
-        return session.scalars(stmt).all()
+        try:
+            stmt = select(cls).where(cls.date == date)
+            instances = session.scalars(stmt).all()
+            return instances, None
+        except Exception as e:
+            return None, e
+
+    @classmethod
+    def get_by_name(cls, session: Session, name:str):
+        try:
+            stmt = select(cls).where(cls.name==name)
+            instance = session.scalar(stmt)
+            return instance, None
+        except Exception as e:
+            return None, e
 
     @classmethod
     def get_by_category(cls, session: Session, category_id: int):#Return the instance with a specific category uses only to expenses and budgets
         if not hasattr(cls, 'category_id'):
-            raise NotImplementedError(f"{cls.__name__} does not have category_id")
-        stmt = select(cls).where(cls.category_id==category_id)
-        return session.scalars(stmt).all()
+            return None, NotImplementedError(f"{cls.__name__} does not have category_id")
+        try:
+            stmt = select(cls).where(cls.category_id==category_id)
+            instances = session.scalars(stmt).all()
+            return instances, None
+        except Exception as e:
+            return None, e
     

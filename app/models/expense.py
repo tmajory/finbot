@@ -1,10 +1,14 @@
-from user import User
-from datetime import date
+from datetime import datetime as dt
 from base import BaseModel
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy.sql import functions as func
-from sqlalchemy.orm import Mapped, Session,mapped_column, relationship
-from sqlalchemy import Numeric, Date, String, ForeignKey, select, extract
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy import Numeric, Date, String, ForeignKey, extract, select
+
+
+if TYPE_CHECKING:
+    from user import User
+    from category import Category    
 
 #Expenses class
 
@@ -14,13 +18,14 @@ class Expense(BaseModel):
     __table_args__ = {'schema':'finbot'}
 
     value: Mapped[float] = mapped_column(Numeric(10,2))#Value of the expense
-    date: Mapped[Date] = mapped_column(Date, default= date.today)#Date of the expense
+    date: Mapped[Date] = mapped_column(Date, default= lambda: dt.date(dt.now()))#Date of the expense
     user_id: Mapped[int] = mapped_column(ForeignKey('finbot.user.id'))#Foreign key of users table
     description: Mapped[str] = mapped_column(String(150), default='')#Small text description about the expense
     category_id : Mapped[int] = mapped_column(ForeignKey('finbot.category.id'))#Foreign key of the categories table
     
     #Relationship declaration
     user: Mapped[Optional["User"]] = relationship(back_populates="expenses")
+    category: Mapped[Optional["Category"]] = relationship(back_populates="expenses")
 
 
     @classmethod
@@ -34,9 +39,10 @@ class Expense(BaseModel):
         return sum_value
     
     @classmethod
-    def expenses_total_by_category(cls, session: Session, category_id:int):
+    def expenses_total_by_category(cls, session: Session, category_id:int, user_id:str):
         """Return the total expenses of that category"""
-        stmt =  select(func.sum(cls.value)).where(cls.category_id==category_id)
+        stmt =  select(func.sum(cls.value)).where(cls.category_id==category_id).where(cls.user_id==user_id)\
+            .where(extract('month',cls.date)== dt.date(dt.now()).month)
         sum_by_category = session.scalar(stmt)
         return sum_by_category
 
