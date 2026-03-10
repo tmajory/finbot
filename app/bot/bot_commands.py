@@ -1,12 +1,13 @@
+#TODO Implementar budget_command e category_commands, usando conversation handler
 import os
 import logging
-from telegram import Update
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from dotenv import load_dotenv
 from datetime import datetime as dt
 from ai.gemini_client import FinanceAnalyst
-from telegram.ext import filters, ContextTypes
+from telegram.ext import filters, ContextTypes, ConversationHandler, MessageHandler
 from utils.insert_utils import insert_expense, insert_budget, insert_category
-from utils.query_utils import get_expenses_by_category, get_monthly_summary
+from utils.query_utils import get_expenses_by_category, get_monthly_summary, get_categories
 
 load_dotenv("config/.env")
 
@@ -15,9 +16,10 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 #env variables
-TOKEN = os.getenv("TELEGRAM_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 assistant = FinanceAnalyst(GEMINI_API_KEY)
+
+ESCOLHA, CATEGORIA, MES = range(3)
 
 #Global variables
 atual_month =  dt.date(dt.now()).month
@@ -91,7 +93,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Como usar:\n"
             "Envie seus gastos: 'Gastei R$ 50 com mercado'\n"
             "Envie comprovante como foto\n"
-            "Comandos: /resumo, /categorias, /orcamento, /ajuda"
+            "Comandos: /resumo, /categorias, /orcamento, /ajuda, /cancelar"
         )
     
 
@@ -101,43 +103,92 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "*Comandos disponíveis*:\n\n"
             "/start - Iniciar o bot\n"
-            "/resumo - ver resumo do mês\n"
+            "/resumo - ver resumo do mês atual ou por categoria até o mês atual.\n"
             "/categorias - ver gastos por categoria\n"
             "/orcamento - Definir orçamento mensal \n"
             "/ajuda - Mostrar esta mensagem"
         )
 
 
-async def monthly_summary(update, user_id):
-    await update.message.reply_text("Digite o mês do ano em número. Ex: 1(Janeiro)")
-    month = int(update.message.text)
-    monthly_summary = get_monthly_summary(user_id, month)
-    month_name = months_names.get(str(month))
-    if monthly_summary != None:
-        await update.message.reply_text (f"Resumo do mês de {month_name}\n" 
-                                         + f"{key}={value}" for key, value in monthly_summary[0].items())
-    await update.message.reply_text(f"Não foi possível gerar o resumo do mês de {month_name}")    
+async def monthly_summary(update, context: ContextTypes.DEFAULT_TYPE):
+    """Pergunta sobre o mês que deve ser retornado o resumo"""
+    reply_keyboard = [[m] for m in months_names.keys()]
+    await update.message.reply_text("Digite o mês do ano em número. Ex: 1(Janeiro)",
+                                    reply_markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True,
+                                                                       input_field_placeholder="mês?"))
+    return MES
 
-async def category_summary(update, user_id):
-    await update.message.reply_text("Qual categoria você gostaria de consultar?")
-    category_name = update.message.text
-    category_summary = get_expenses_by_category(user_id, category_name)
-    if category_summary:
-        await update.message.reply_text(f"Total gasto com {category_name} este mês: R$ {category_summary[0].get(category_name):.2f}")
-    await update.message.reply_text(f"Não foi encontrado gastos em {category_name} este mês.")
+
+async def category_summary(update, context: ContextTypes.DEFAULT_TYPE):
+    """Pergunta a categoria que o usuário gostaria de ver e retorna"""
+    reply_keyboard = get_categories()[0]
+    if not reply_keyboard:
+        await update.message.reply_text("Não foram encontradas categorias no banco de dados!")
+        return ConversationHandler.END
+    await update.message.reply_text("Qual categoria você gostaria de consultar?",
+                                   reply_markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True,
+                                    input_field_placeholder="Categoria"))
+    return CATEGORIA
+
+async def escolha(update, context: ContextTypes.DEFAULT_TYPE):
+    """Retorna a escolha do tipo de resumo se de categoria ou de um mês específico"""
+    reply_keyboard =[['1'],['2']]
+    await update.message.reply_text("Qual o tipo de resumo você gostaria de consultar? \n" \
+    "1 - Resumo de gastos em uma categoria de janeiro até o mês atual\n" \
+    "2 - Resumo de gastos no mês atual por categora.\n", reply_markup = ReplyKeyboardMarkup(reply_keyboard,
+                                                        one_time_keyboard=True, input_field_placeholder="Tipo resumo:"))
+    return ESCOLHA
 
 
 async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Comando que retorna mensagem com o resumo de gastos do mês po categoria
-    Futuramente mostrará também estatísticas de orçamento e/ou metas"""
-    resume_type = {'1':category_summary ,'2':monthly_summary}
+    await escolha(update, context)
+    return ESCOLHA
+
+
+async def handle_escolha(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    options = {'1':category_summary, '2':monthly_summary}
     if update.message:
-        await update.message.reply_text("Selecione o resumo: 1: Por categoria(mês atual) \n 2: Mensal")
-        for key, func in resume_type.items():
-           if update.effective_user: await func(update, str(update.effective_user.id))
-           break
-        
-        
+        option = update.message.text   
+        if option in options:
+            return await options[option](update,context)
+        await update.message.reply_text("Opção inválida! Digite 1 ou 2")
+        return ESCOLHA
+
+async def handle_month(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message and update.effective_user:
+        month = update.message.text
+        user_id = str(update.effective_user.id)
+        if month not in months_names: 
+            await update.message.reply_text("Mês não encontrado") 
+            return ConversationHandler.END
+        data, e = get_monthly_summary(user_id, int(month)) 
+        if  e or not data:
+            await update.message.reply_text("Não foi possível gerar o resumo")
+            return ConversationHandler.END
+        lines = "\n".join(f"{months_names.get(k,k)}: R$ {v:.2f}" for k,v in data.items())
+        await update.message.reply_text(f"Resumo do mês de {months_names.get(month)}\n\n {lines}",
+                                        reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
+
+
+async def category_handle(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message and update.effective_user:
+        category = update.message.text
+        user_id = update.effective_user.id
+        data, e = get_expenses_by_category(user_id, category)
+        if e or not data:
+            await update.message.reply_text(f"Não foi possível gerar resumo para categoria {category}")
+            return ConversationHandler.END
+        lines = "\n".join(f"{months_names.get(k,k)}: R$ {v:.2f}" for k,v in data.items())
+        await update.message.reply_text(f"Resumo de gastos em {category} até {months_names.get(str(atual_month))}\n\n {lines}",
+                                        reply_markup=ReplyKeyboardRemove())
+        return ConversationHandler.END
+
+async def cancelar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message:
+        await update.message.reply_text("Cancelando operação")
+        return ConversationHandler.END
+
 
 
 async def categories_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
