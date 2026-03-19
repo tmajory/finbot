@@ -15,6 +15,7 @@ engine = create_engine(DATABASE_URL)
 SessionFactory = sessionmaker(bind=engine)
  
 
+
 @contextmanager
 def get_session() -> Generator[Session, None, None]:
     session = SessionFactory()

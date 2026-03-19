@@ -1,5 +1,5 @@
 from datetime import datetime as dt
-from base import BaseModel
+from .base import BaseModel
 from typing import Optional, TYPE_CHECKING
 from sqlalchemy.sql import functions as func
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -15,13 +15,12 @@ if TYPE_CHECKING:
 class Expense(BaseModel):
 
     __tablename__ ='expense'
-    __table_args__ = {'schema':'finbot'}
 
     value: Mapped[float] = mapped_column(Numeric(10,2))#Value of the expense
     date: Mapped[Date] = mapped_column(Date, default= lambda: dt.date(dt.now()))#Date of the expense
-    user_id: Mapped[int] = mapped_column(ForeignKey('finbot.user.id'))#Foreign key of users table
+    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))#Foreign key of users table
     description: Mapped[str] = mapped_column(String(150), default='')#Small text description about the expense
-    category_id : Mapped[int] = mapped_column(ForeignKey('finbot.category.id'))#Foreign key of the categories table
+    category_id : Mapped[int] = mapped_column(ForeignKey('category.id'))#Foreign key of the categories table
     
     #Relationship declaration
     user: Mapped[Optional["User"]] = relationship(back_populates="expenses")

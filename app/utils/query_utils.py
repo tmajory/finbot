@@ -1,10 +1,10 @@
-#Métodos de acesso aos dados do banco para serem usados no comando resumo e no dashboard
-from datetime import datetime, date
+from datetime import datetime
 from models.expense import Expense
 from models.category import Category
+from models.budget import Budget
 from database.session_manager import get_session
 from sqlalchemy import select, extract,func
-from typing import List
+
 
 
 def get_monthly_summary(user_id, month):
@@ -41,7 +41,6 @@ def get_expenses_by_category(user_id, category_name):
             return data, e
 
 
-
 def get_categories():
     categories_names = []
     with get_session() as session:
@@ -50,5 +49,29 @@ def get_categories():
             if categories:
                 categories_names = [[categorie.name] for categorie in categories]
             return categories_names, None
+        except Exception as e:
+            return None, e
+
+
+def get_budget(category_id, user_id, month=None, year=None):
+    """Procura por um orçamento e retorna um dicionário que contém a instância no campo data"""
+    with get_session() as session:
+        try:
+            budget = Budget.budget_by_category_month_year(session, user_id, category_id, month, year)[0]
+            if not budget:
+                return None, None
+            return budget.to_dict(), None
+        except Exception as e:
+            return None, e
+
+
+def get_category(category_name):
+    """Procura por uma categoria e retorna um dicionário que contém a instância no campo data"""
+    with get_session() as session:
+        try:
+            category = Category.get_by_name(session, category_name)[0]
+            if not category:
+                return None, None
+            return category.to_dict(), None
         except Exception as e:
             return None, e

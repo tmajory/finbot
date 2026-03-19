@@ -1,4 +1,4 @@
-from base import BaseModel
+from .base import BaseModel
 from typing import List, TYPE_CHECKING
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import String
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 
 class Category(BaseModel):
     __tablename__ = 'category'
-    __table_args__ = {'schema': 'finbot'}
+
 
     name : Mapped[str] = mapped_column(String(50), unique=True)#Unique name 
     #Expenses table relationship configuration
